@@ -1,0 +1,13 @@
+{
+    "md_mutant_name": "UPDATE: must be folder directory",
+    "num_residues": 56,
+    "time_interval": 125,
+    "center": true,
+    "superimpose": true,
+    "features": ["Residue", " Residue Name", " Timestep", " Backbone Displacement", " Residue Centroid Displacement", 
+    " Side Chain Centroid Displacement", " Side Chain Centroid x Position", " Side Chain Centroid y Position", 
+    " Side Chain Centroid z Position", " Backbone to Side Chain Displacement", " Entropy", " Entropy State",  
+    " Mean Potential Energy", " Variance in Potential Energy", " Radius of Gyration"],
+    "new_csv": true,
+    "new_csv_name": "/home/annika/md_sims/final_extraction/json_dihedral_test_superimposed_md_features_centered_mod_changed_sele.csv"
+}
