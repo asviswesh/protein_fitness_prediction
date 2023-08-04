@@ -100,6 +100,8 @@ class Residue:
         return 0
 
     def assign_one_state(self, chi1):
+        if chi1 < -120:
+            chi1 += 360
         one_state_library = self.create_one_state_library()
         chi1_dist = []
         for i in range(len(one_state_library)):
@@ -107,6 +109,10 @@ class Residue:
         return np.argmin(chi1_dist)
 
     def assign_two_state(self, chi1, chi2):
+        if chi1 < -120:
+            chi1 += 360
+        if chi2 < -120:
+            chi2 += 360
         two_state_library = self.create_two_state_library()
         chi1_dist = []
         chi2_dist = []
@@ -123,6 +129,12 @@ class Residue:
         return state_val[0]
 
     def assign_three_state(self, chi1, chi2, chi3):
+        if chi1 < -120:
+            chi1 += 360
+        if chi2 < -120:
+            chi2 += 360
+        if chi3 < -120:
+            chi3 += 360
         three_state_library = self.create_three_state_library()
         chi1_dist = []
         chi2_dist = []
@@ -144,6 +156,14 @@ class Residue:
         return state_val[0]
 
     def assign_four_state(self, chi1, chi2, chi3, chi4):
+        if chi1 < -120:
+            chi1 += 360
+        if chi2 < -120:
+            chi2 += 360
+        if chi3 < -120:
+            chi3 += 360
+        if chi4 < -120:
+            chi4 += 360
         four_state_library = self.create_four_state_library()
         chi1_dist = []
         chi2_dist = []
