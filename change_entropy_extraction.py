@@ -93,6 +93,7 @@ class Residue:
                                                            self.chi_list[1]: self.chi_angles_list[j],
                                                            self.chi_list[2]: self.chi_angles_list[k],
                                                            self.chi_list[3]: self.chi_angles_list[l]}})
+                        curr_state += 1
         return state_lib
 
     def assign_zero_state(self):
@@ -107,31 +108,18 @@ class Residue:
 
     def assign_two_state(self, chi1, chi2):
         two_state_library = self.create_two_state_library()
-        # if self.res_num == 35:
-        #     print(two_state_library)
         chi1_dist = []
         chi2_dist = []
         for i in range(len(two_state_library)):
             chi1_dist.append(abs(chi1 - two_state_library[i]["chi1"]))
             chi2_dist.append(abs(chi2 - two_state_library[i]["chi2"]))
-        # if self.res_num == 35:
-        #     print(chi1_dist)
-        #     print(chi2_dist)
         chi1_index = np.argmin(chi1_dist)
         chi2_index = np.argmin(chi2_dist)
         chi1_angle = two_state_library.get(chi1_index).get('chi1')
         chi2_angle = two_state_library.get(chi2_index).get('chi2')
         temp_chi_dict = {'chi1': chi1_angle, 'chi2': chi2_angle}
-        # if self.res_num == 35:
-        #     for key in two_state_library.keys():
-        #         print(key)
-        #         print(two_state_library.get(key))
-        # if self.res_num == 35:
-        #     print(temp_chi_dict)
         state_val = [
             i for i in two_state_library if two_state_library[i] == temp_chi_dict]
-        # if self.res_num == 35:
-        #     print(state_val)
         return state_val[0]
 
     def assign_three_state(self, chi1, chi2, chi3):
