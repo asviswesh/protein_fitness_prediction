@@ -39,11 +39,11 @@ def create_train_dataset(sheet_name):
                     writer.writerow(line)
 
 
-def create_test_dataset(sheet_name):
+def create_test_dataset(sheet_name, need_fitness):
     base_path = '/home/annika/mlde/'
     csv_path = base_path + sheet_name
     if '.csv' not in sheet_name:
-        raise ValueError("Data is not in the .csv file.")
+        raise ValueError("Must specify .csv when giving filename.")
     with open(csv_path, 'w') as test_csv:
         col_names = get_rows_for_csv(
             '/home/annika/mlde/four_mutations_full_data.csv')
@@ -53,7 +53,8 @@ def create_test_dataset(sheet_name):
             reader_obj = csv.DictReader(full_data)
             for line in reader_obj:
                 if line.get('HD') == '2':
-                    line.pop("Fitness")
+                    if need_fitness:
+                        line.pop("Fitness")
                     line.pop('keep')
                     line.pop('one_vs_rest')
                     line.pop('one_vs_rest_validation')
@@ -69,4 +70,5 @@ def create_test_dataset(sheet_name):
 
 
 create_train_dataset('gb1_train.csv')
-create_test_dataset('gb1_test.csv')
+create_test_dataset('gb1_test.csv', False)
+create_test_dataset('gb1_test_with_fitness.csv', True)

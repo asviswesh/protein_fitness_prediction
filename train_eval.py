@@ -2,14 +2,19 @@ import pickle
 import json
 import os
 import random
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
 import torch
 import torch.utils.data
 import torch.nn as nn
 from feed_forward_draft import NeuralNet
+from pathlib import Path
 from pytorchtools import EarlyStopping
 from tqdm.auto import tqdm
+from sklearn.metrics import mean_squared_error
+from scipy.stats import spearmanr
 from sklearn.metrics import ndcg_score
 from sklearn.model_selection import train_test_split, KFold
 from models import *
@@ -72,6 +77,8 @@ class MLDESim():
             dataframe=self.train_fitness_df, dataset_type="train", to_predict=self.feat_to_predict)
         self.test_dataset = Dataset(
             dataframe=self.test_fitness_df, dataset_type="test", to_predict=self.feat_to_predict)
+        self.test_with_fitness = Dataset(
+            dataframe=self.test_fitness_df, dataset_type="test", to_predict=self.feat_to_predict)
 
         self.train_dataset.encode_X(encoding=encoding)
         self.test_dataset.encode_X(encoding=encoding)
@@ -80,6 +87,7 @@ class MLDESim():
         self.X_test = np.array(self.test_dataset.X)
 
         self.y_train_all = np.array(self.train_dataset.y)
+        self.y_test_with_fitness = np.array(self.test_with_fitness.y)
 
         self.all_combos = self.train_dataset.all_combos
         self.n_sites = self.train_dataset.n_residues
@@ -174,8 +182,15 @@ class MLDESim():
                         df[self.feat_to_predict] = new_series
                         # Write the updated DataFrame back to the CSV file
                         df.to_csv(self.save_path + 'results.csv', index=False)
-        pbar.close
+                    
+            test_rho, test_mse = self.evaluate_model(y_preds, self.y_test_with_fitness)
+            print('test stats: Spearman: %.2f MSE: %.2f ' % (test_rho, test_mse))
+            plt.figure()
+            plt.title('predicted (y) vs. labels (x)')
+            sns.scatterplot(x = self.y_test_with_fitness, y = y_preds, s = 2, alpha = 0.2)
+            plt.savefig(self.save_path + 'preds_vs_labels.png', dpi = 300)
 
+        pbar.close
         return
 
     def train_single(self, X_train: np.ndarray, y_train: np.ndarray, X_validation: np.ndarray, y_validation: np.ndarray):
@@ -196,6 +211,13 @@ class MLDESim():
         y_preds = clf[0].predict(self.X_test)
 
         return y_preds, clf
+    
+    def evaluate_model(self, predictions, labels):
+        predicted = np.array(predictions)
+        labels = np.array(labels)
+        rho, _ = spearmanr(predicted, labels) # spearman
+        mse = mean_squared_error(predicted, labels)
+        return round(rho, 2), round(mse, 2)
 
     def run_neural_network(self, learning_rate, num_epochs):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
