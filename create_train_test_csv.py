@@ -1,30 +1,22 @@
 import csv
 
-
-def get_rows_for_csv(csv_file):
-    with open(csv_file) as csv_file:
-        csv_reader = csv.reader(csv_file, delimiter=',')
-        list_of_column_names = []
-        for row in csv_reader:
-            list_of_column_names.append(row)
-            break
-    return list_of_column_names[0]
-
-
 def create_train_dataset(sheet_name):
     base_path = '/home/annika/mlde/'
     csv_path = base_path + sheet_name
     if '.csv' not in sheet_name:
         raise ValueError("Data is not in the .csv file.")
     with open(csv_path, 'w') as train_csv:
-        col_names = get_rows_for_csv(
-            '/home/annika/mlde/four_mutations_full_data.csv')
-        writer = csv.DictWriter(train_csv, fieldnames=col_names[:6])
+        col_names = ['Variants', 'Fitness', 'sequence']
+        print(col_names)
+        writer = csv.DictWriter(train_csv, fieldnames=col_names)
         writer.writeheader()
         with open('/home/annika/mlde/four_mutations_full_data.csv', 'r') as full_data:
             reader_obj = csv.DictReader(full_data)
             for line in reader_obj:
                 if line.get('HD') == '1':
+                    line.pop('HD')
+                    line.pop('Count input')
+                    line.pop('Count selected')
                     line.pop('keep')
                     line.pop('one_vs_rest')
                     line.pop('one_vs_rest_validation')
@@ -45,9 +37,8 @@ def create_test_dataset(sheet_name, need_fitness):
     if '.csv' not in sheet_name:
         raise ValueError("Must specify .csv when giving filename.")
     with open(csv_path, 'w') as test_csv:
-        col_names = get_rows_for_csv(
-            '/home/annika/mlde/four_mutations_full_data.csv')
-        writer = csv.DictWriter(test_csv, fieldnames=col_names[:6])
+        col_names = ['Variants', 'Fitness', 'sequence']
+        writer = csv.DictWriter(test_csv, fieldnames=col_names)
         writer.writeheader()
         with open('/home/annika/mlde/four_mutations_full_data.csv', 'r') as full_data:
             reader_obj = csv.DictReader(full_data)
@@ -55,6 +46,9 @@ def create_test_dataset(sheet_name, need_fitness):
                 if line.get('HD') == '2':
                     if need_fitness:
                         line.pop("Fitness")
+                    line.pop('HD')
+                    line.pop('Count input')
+                    line.pop('Count selected')
                     line.pop('keep')
                     line.pop('one_vs_rest')
                     line.pop('one_vs_rest_validation')
@@ -70,5 +64,5 @@ def create_test_dataset(sheet_name, need_fitness):
 
 
 create_train_dataset('gb1_train.csv')
-create_test_dataset('gb1_test.csv', False)
-create_test_dataset('gb1_test_with_fitness.csv', True)
+create_test_dataset('gb1_test.csv', True)
+create_test_dataset('gb1_test_with_fitness.csv', False)
