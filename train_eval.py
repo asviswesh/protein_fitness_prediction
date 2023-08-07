@@ -77,17 +77,18 @@ class MLDESim():
             dataframe=self.train_fitness_df, dataset_type="train", to_predict=self.feat_to_predict)
         self.test_dataset = Dataset(
             dataframe=self.test_fitness_df, dataset_type="test", to_predict=self.feat_to_predict)
-        self.test_with_fitness = Dataset(
+        self.test_dataset_with_fitness = Dataset(
             dataframe=self.test_fitness_df, dataset_type="test", to_predict=self.feat_to_predict)
 
         self.train_dataset.encode_X(encoding=encoding)
         self.test_dataset.encode_X(encoding=encoding)
+        self.test_dataset_with_fitness.encode_X(encoding=encoding)
 
         self.X_train_all = np.array(self.train_dataset.X)
         self.X_test = np.array(self.test_dataset.X)
 
         self.y_train_all = np.array(self.train_dataset.y)
-        self.y_test_with_fitness = np.array(self.test_with_fitness.y)
+        self.y_test_with_fitness = np.array(self.test_dataset_with_fitness.y)
 
         self.all_combos = self.train_dataset.all_combos
         self.n_sites = self.train_dataset.n_residues
@@ -182,13 +183,16 @@ class MLDESim():
                         df[self.feat_to_predict] = new_series
                         # Write the updated DataFrame back to the CSV file
                         df.to_csv(self.save_path + 'results.csv', index=False)
-                    
-            test_rho, test_mse = self.evaluate_model(y_preds, self.y_test_with_fitness)
-            print('test stats: Spearman: %.2f MSE: %.2f ' % (test_rho, test_mse))
+
+            test_rho, test_mse = self.evaluate_model(
+                y_preds, self.y_test_dataset_with_fitness)
+            print('test stats: Spearman: %.2f MSE: %.2f ' %
+                  (test_rho, test_mse))
             plt.figure()
             plt.title('predicted (y) vs. labels (x)')
-            sns.scatterplot(x = self.y_test_with_fitness, y = y_preds, s = 2, alpha = 0.2)
-            plt.savefig(self.save_path + 'preds_vs_labels.png', dpi = 300)
+            sns.scatterplot(x=self.y_test_with_fitness,
+                            y=y_preds, s=2, alpha=0.2)
+            plt.savefig(self.save_path + 'preds_vs_labels.png', dpi=300)
 
         pbar.close
         return
@@ -211,11 +215,11 @@ class MLDESim():
         y_preds = clf[0].predict(self.X_test)
 
         return y_preds, clf
-    
+
     def evaluate_model(self, predictions, labels):
         predicted = np.array(predictions)
         labels = np.array(labels)
-        rho, _ = spearmanr(predicted, labels) # spearman
+        rho, _ = spearmanr(predicted, labels)  # spearman
         mse = mean_squared_error(predicted, labels)
         return round(rho, 2), round(mse, 2)
 
@@ -224,14 +228,9 @@ class MLDESim():
         print(device)
         # For fold results
         results = {}
-        # Plot train and validation loss and save the figures!
-        # Set fixed random number seed
         torch.manual_seed(42)
-        # Loss and optimizer
-        # might want to use MeanSquareError (check documentation)
         k_folds = 5
         criterion = nn.MSELoss(reduction='sum')
-        # Device configuration
         x_train_tensor = torch.Tensor(self.X_train_all)
         y_train_tensor = torch.Tensor(self.y_train_all)
         total_trainset = torch.utils.data.TensorDataset(
@@ -239,11 +238,10 @@ class MLDESim():
         trainloader = torch.utils.data.DataLoader(
             total_trainset, batch_size=128, shuffle=True)
 
-        test_tensor = torch.Tensor(self.test_dataset.X)
+        test_tensor = torch.Tensor(self.test_dataset_with_fitness.X)
         testset = torch.utils.data.TensorDataset(test_tensor)
         testloader = torch.utils.data.DataLoader(
             testset, batch_size=128, shuffle=False)
-        print(type(testloader))
 
         self.input_size = self.X_train_all.shape[1]
         print(type(self.input_size))
@@ -257,12 +255,8 @@ class MLDESim():
                           self.hidden_size2, 1).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=self.learning_rate)
 
-        # total_data = ConcatDataset(trainset, testset)
-
         # Define the K-fold Cross Validator
         kfold = KFold(n_splits=k_folds, shuffle=True)
-        # Train the model
-        real_total_step = len(trainloader)
 
         for fold, (train_ids, validation_ids) in enumerate(kfold.split(total_trainset)):
             print(f"Fold{fold}")
@@ -317,12 +311,6 @@ class MLDESim():
                     loss = criterion(output, target.to(device))
                     # record validation loss
                     valid_losses.append(loss.item())
-                    # if (i+1) % 100 == 0:
-                    #     # Compile losses manually and then compute the mean.
-                    #     print ('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'
-                    #         .format(epoch+1, self.num_epochs, i+1, real_total_step, loss.item()))
-                # print training/validation statistics
-                # calculate average loss over an epoch
                 train_loss = np.average(train_losses)
                 valid_loss = np.average(valid_losses)
                 avg_train_losses.append(train_loss)
@@ -331,8 +319,8 @@ class MLDESim():
                 epoch_len = len(str(self.num_epochs))
 
                 print_msg = (f'[{epoch:>{epoch_len}}/{self.num_epochs:>{epoch_len}}] ' +
-                             f'train_loss: {train_loss:.5f} ' +
-                             f'valid_loss: {valid_loss:.5f}')
+                             f'average train_loss: {train_loss:.5f} ' +
+                             f'average valid_loss: {valid_loss:.5f}')
 
                 print(print_msg)
 
@@ -347,17 +335,23 @@ class MLDESim():
                 if early_stopping.early_stop:
                     print("Early stopping")
                     break
+
         # move the testing and average across all five loops.
         with torch.no_grad():
             correct = 0
             total = 0
-            print(testloader)
-            # for i, (data, quantity_to_predict) in enumerate(testloader):
+            label_index = 0
             for data in testloader:
-                # data = torch.Tensor(data).int()
                 outputs = model(data[0].to(device))
-                print(outputs.shape)
                 outputs = outputs.cpu()
+                labels = self.y_test_with_fitness[label_index:label_index +
+                                                  outputs.shape[0]]
+                labels_tensor = torch.Tensor(labels)
+                labels_tensor = labels_tensor.to(device)
+                predicted, _ = torch.max(outputs.data, 1)
+                predicted = predicted.to(device)
+                total += labels_tensor.size(0)
+                correct += (predicted == labels_tensor).sum().item()
                 if self.first_append:
                     # Define the filename and delimiter for the CSV file
                     filename = self.save_path + 'results.csv'
@@ -369,7 +363,6 @@ class MLDESim():
                                header=delimiter.join(column_names), comments='')
                 else:
                     outputs = outputs.flatten()
-                    # np.squeeze(new_column)
                     # Convert the NumPy array to a Pandas Series
                     df = pd.read_csv(self.save_path + 'results.csv')
                     new_series = pd.Series(outputs)
@@ -379,11 +372,15 @@ class MLDESim():
 
                     # Write the updated DataFrame back to the CSV file
                     df.to_csv(self.save_path + 'results.csv', index=False)
-
-                # total += things_to_predict.size(0)
-                # correct += (predicted == things_to_predict).sum().item()
-
-            # print('Accuracy of the network on sequence data: {} %'.format(100 * correct / total))
+                label_index += outputs.shape[0]
+            print('Accuracy of the network on sequence data: {} %'.format(
+                100 * correct / total))
 
             # Save the model checkpoint
-            torch.save(model.state_dict(), 'model.ckpt')
+        # test_rho, test_mse = self.evaluate_model(outputs, self.y_test_with_fitness)
+        # print('test stats: Spearman: %.2f MSE: %.2f ' % (test_rho, test_mse))
+        # plt.figure()
+        # plt.title('predicted (y) vs. labels (x)')
+        # sns.scatterplot(x = self.y_test_with_fitness, y = output, s = 2, alpha = 0.2)
+        # plt.savefig(self.save_path + 'nn_preds_vs_labels.png', dpi = 300)
+        torch.save(model.state_dict(), 'model.ckpt')
