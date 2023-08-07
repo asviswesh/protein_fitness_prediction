@@ -9,7 +9,7 @@ import seaborn as sns
 import torch
 import torch.utils.data
 import torch.nn as nn
-from feed_forward_draft import NeuralNet
+from pytorch_models import *
 from pathlib import Path
 from pytorchtools import EarlyStopping
 from tqdm.auto import tqdm
@@ -19,9 +19,6 @@ from sklearn.metrics import ndcg_score
 from sklearn.model_selection import train_test_split, KFold
 from models import *
 from Datasets import Dataset
-
-# from DeCOIL.src.oracle import Oracle
-# from DeCOIL.src.encoding_utils import *
 
 
 def ndcg(y_true, y_pred):
@@ -167,21 +164,16 @@ class MLDESim():
                     means = np.mean(final_preds, axis=1)
                     y_preds = means[:]
                     if self.first_append:
-                        # Define the filename and delimiter for the CSV file
                         filename = self.save_path + 'results.csv'
                         delimiter = ','
-                        # Define column names
                         column_names = [self.feat_to_predict]
-                        # Write the NumPy array to the CSV file with column names
                         np.savetxt(filename, y_preds, delimiter=delimiter,
                                    header=delimiter.join(column_names), comments='')
                     else:
                         y_preds = y_preds.flatten()
                         df = pd.read_csv(self.save_path + 'results.csv')
                         new_series = pd.Series(y_preds)
-                        # Add the new column to the DataFrame
                         df[self.feat_to_predict] = new_series
-                        # Write the updated DataFrame back to the CSV file
                         df.to_csv(self.save_path + 'results.csv', index=False)
 
             test_rho, test_mse = self.evaluate_model(
@@ -219,13 +211,12 @@ class MLDESim():
     def evaluate_model(self, predictions, labels):
         predicted = np.array(predictions)
         labels = np.array(labels)
-        rho, _ = spearmanr(predicted, labels)  # spearman
+        rho, _ = spearmanr(predicted, labels)
         mse = mean_squared_error(predicted, labels)
         return round(rho, 2), round(mse, 2)
 
     def run_neural_network(self, learning_rate, num_epochs):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        print(device)
         # For fold results
         results = {}
         torch.manual_seed(42)
@@ -243,40 +234,52 @@ class MLDESim():
         testloader = torch.utils.data.DataLoader(
             testset, batch_size=128, shuffle=False)
 
-        self.input_size = self.X_train_all.shape[1]
-        print(type(self.input_size))
-        self.hidden_size1 = 600
-        print(type(self.hidden_size1))
-        self.hidden_size2 = 30
         self.learning_rate = learning_rate
         self.num_epochs = num_epochs
-
-        model = NeuralNet(self.input_size, self.hidden_size1,
-                          self.hidden_size2, 1).to(device)
+        if self.model_class == 'feed forward':
+            self.input_size = self.X_train_all.shape[1]
+            self.hidden_size1 = 600
+            self.hidden_size2 = 30
+            model = NeuralNet(self.input_size, self.hidden_size1,
+                            self.hidden_size2, 1).to(device)
+        elif self.model_class == 'cnn':
+            vocab = "ACDEFGHIKLMNPQRSTVWY"
+            collate = ASCollater(vocab, Tokenizer(vocab), pad=True)
+            self.vocab_size = len(vocab)
+            self.max_input_size = 1024
+            self.kernel_size = k_folds
+            trainloader = torch.utils.data.DataLoader(
+            total_trainset, collate_fn=collate, batch_size=128, shuffle=True)
+            model = SeqConvNetwork(self.vocab_size, self.max_input_size, self.kernel_size, dropout=0.0)
         optimizer = torch.optim.Adam(model.parameters(), lr=self.learning_rate)
 
-        # Define the K-fold Cross Validator
         kfold = KFold(n_splits=k_folds, shuffle=True)
 
         for fold, (train_ids, validation_ids) in enumerate(kfold.split(total_trainset)):
             print(f"Fold{fold}")
-            # Sample elements randomly from a given list of ids, no replacement.
             train_subsampler = torch.utils.data.SubsetRandomSampler(train_ids)
             validation_subsampler = torch.utils.data.SubsetRandomSampler(
                 validation_ids)
 
-            # Define data loaders for training and testing data in this fold
-            trainloader = torch.utils.data.DataLoader(
-                total_trainset,
-                batch_size=10, sampler=train_subsampler)
-            validationloader = torch.utils.data.DataLoader(
-                total_trainset,
-                batch_size=10, sampler=validation_subsampler)
+            if self.model_class == 'cnn':
+                trainloader = torch.utils.data.DataLoader(
+                    total_trainset, collate_fn=collate,
+                    batch_size=10, sampler=train_subsampler)
+                validationloader = torch.utils.data.DataLoader(
+                    total_trainset, collate_fn=collate,
+                    batch_size=10, sampler=validation_subsampler)
+            else:
+                trainloader = torch.utils.data.DataLoader(
+                    total_trainset, 
+                    batch_size=10, sampler=train_subsampler)
+                validationloader = torch.utils.data.DataLoader(
+                    total_trainset, 
+                    batch_size=10, sampler=validation_subsampler)
 
             train_subsampler = torch.utils.data.SubsetRandomSampler(train_ids)
             validation_subsampler = torch.utils.data.SubsetRandomSampler(
                 validation_ids)
-            # Define data loaders for training and testing data in this fold
+
             trainloader = torch.utils.data.DataLoader(
                 total_trainset,
                 batch_size=10, sampler=train_subsampler)
@@ -291,12 +294,18 @@ class MLDESim():
             avg_train_losses = []
             # to track the average validation loss per epoch as the model trains
             avg_valid_losses = []
-            # try somewhere from 10 to 100 for number of epochs
             early_stopping = EarlyStopping(verbose=True)
             for epoch in range(self.num_epochs):
-                for i, (data, quantity_to_predict) in enumerate(trainloader):
+                for i, batch in enumerate(trainloader):
+                    try:
+                        data, quantity_to_predict, mask = batch
+                    except:
+                        data, quantity_to_predict = batch
                     # Forward pass
-                    outputs = model(data.to(device))
+                    if self.model_class == 'cnn':
+                        outputs = model(data.to(device), mask)
+                    else:
+                        outputs = model(data.to(device))
                     loss = criterion(outputs, quantity_to_predict.to(device))
                     # Backward and optimize
                     optimizer.zero_grad()
@@ -333,7 +342,6 @@ class MLDESim():
                 early_stopping(valid_loss, model)
 
                 if early_stopping.early_stop:
-                    print("Early stopping")
                     break
 
         # move the testing and average across all five loops.
@@ -353,30 +361,21 @@ class MLDESim():
                 total += labels_tensor.size(0)
                 correct += (predicted == labels_tensor).sum().item()
                 if self.first_append:
-                    # Define the filename and delimiter for the CSV file
                     filename = self.save_path + 'results.csv'
                     delimiter = ','
-                    # Define column names
                     column_names = [self.feat_to_predict]
-                    # Write the NumPy array to the CSV file with column names
                     np.savetxt(filename, outputs, delimiter=delimiter,
                                header=delimiter.join(column_names), comments='')
                 else:
                     outputs = outputs.flatten()
-                    # Convert the NumPy array to a Pandas Series
                     df = pd.read_csv(self.save_path + 'results.csv')
                     new_series = pd.Series(outputs)
-
-                    # Add the new column to the DataFrame
                     df[self.feat_to_predict] = new_series
-
-                    # Write the updated DataFrame back to the CSV file
                     df.to_csv(self.save_path + 'results.csv', index=False)
                 label_index += outputs.shape[0]
             print('Accuracy of the network on sequence data: {} %'.format(
                 100 * correct / total))
 
-            # Save the model checkpoint
         # test_rho, test_mse = self.evaluate_model(outputs, self.y_test_with_fitness)
         # print('test stats: Spearman: %.2f MSE: %.2f ' % (test_rho, test_mse))
         # plt.figure()
