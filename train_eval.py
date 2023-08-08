@@ -70,13 +70,18 @@ class MLDESim():
             '/home/annika/mlde/' + self.train_name)
         self.test_fitness_df = pd.read_csv(
             '/home/annika/mlde/' + self.test_name)
+        self.test_with_fitness_df = pd.read_csv(
+            '/home/annika/mlde/gb1_test_with_fitness.csv'
+        )
         self.train_dataset = Dataset(
             dataframe=self.train_fitness_df, dataset_type="train", to_predict=self.feat_to_predict)
         self.test_dataset = Dataset(
             dataframe=self.test_fitness_df, dataset_type="test", to_predict=self.feat_to_predict)
         self.test_dataset_with_fitness = Dataset(
-            dataframe=self.test_fitness_df, dataset_type="test", to_predict=self.feat_to_predict)
-
+            dataframe=self.test_with_fitness_df, dataset_type="test", to_predict=self.feat_to_predict)
+        # Couple the combo with the .npy file -> shoud know which index
+        # based on that - stor the embedding as list in the csv file.
+        # Do it for each variant in the loop.
         self.train_dataset.encode_X(encoding=encoding)
         self.test_dataset.encode_X(encoding=encoding)
         self.test_dataset_with_fitness.encode_X(encoding=encoding)
@@ -175,9 +180,9 @@ class MLDESim():
                         new_series = pd.Series(y_preds)
                         df[self.feat_to_predict] = new_series
                         df.to_csv(self.save_path + 'results.csv', index=False)
-
+            print(self.y_test_with_fitness)
             test_rho, test_mse = self.evaluate_model(
-                y_preds, self.y_test_dataset_with_fitness)
+                y_preds, self.y_test_with_fitness)
             print('test stats: Spearman: %.2f MSE: %.2f ' %
                   (test_rho, test_mse))
             plt.figure()
@@ -238,35 +243,34 @@ class MLDESim():
         self.num_epochs = num_epochs
         if self.model_class == 'feed forward':
             self.input_size = self.X_train_all.shape[1]
+            print(self.input_size)
             self.hidden_size1 = 600
             self.hidden_size2 = 30
             model = NeuralNet(self.input_size, self.hidden_size1,
                             self.hidden_size2, 1).to(device)
         elif self.model_class == 'cnn':
-            vocab = "ACDEFGHIKLMNPQRSTVWY"
-            collate = ASCollater(vocab, Tokenizer(vocab), pad=True)
-            self.vocab_size = len(vocab)
+            self.vocab_size = 80
             self.max_input_size = 1024
             self.kernel_size = k_folds
             trainloader = torch.utils.data.DataLoader(
-            total_trainset, collate_fn=collate, batch_size=128, shuffle=True)
-            model = SeqConvNetwork(self.vocab_size, self.max_input_size, self.kernel_size, dropout=0.0)
+            total_trainset, batch_size=128, shuffle=True)
+            model = SeqConvNetwork(self.vocab_size, self.max_input_size, self.kernel_size, 
+                                   dropout=0.0).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=self.learning_rate)
 
         kfold = KFold(n_splits=k_folds, shuffle=True)
 
         for fold, (train_ids, validation_ids) in enumerate(kfold.split(total_trainset)):
-            print(f"Fold{fold}")
             train_subsampler = torch.utils.data.SubsetRandomSampler(train_ids)
             validation_subsampler = torch.utils.data.SubsetRandomSampler(
                 validation_ids)
 
             if self.model_class == 'cnn':
                 trainloader = torch.utils.data.DataLoader(
-                    total_trainset, collate_fn=collate,
+                    total_trainset,
                     batch_size=10, sampler=train_subsampler)
                 validationloader = torch.utils.data.DataLoader(
-                    total_trainset, collate_fn=collate,
+                    total_trainset,
                     batch_size=10, sampler=validation_subsampler)
             else:
                 trainloader = torch.utils.data.DataLoader(
@@ -290,28 +294,35 @@ class MLDESim():
             train_losses = []
             # to track the validation loss as the model trains
             valid_losses = []
+            # to track the training mse as the model trains
+            train_mse = []
+            # to track the validation mse as the model trains
+            valid_mse = []
             # to track the average training loss per epoch as the model trains
             avg_train_losses = []
             # to track the average validation loss per epoch as the model trains
             avg_valid_losses = []
+            # to track the average training mse per epoch as the model trains
+            avg_train_mses = []
+            # to track the average validation mse per epoch as the model trains
+            avg_valid_mses = []
             early_stopping = EarlyStopping(verbose=True)
             for epoch in range(self.num_epochs):
                 for i, batch in enumerate(trainloader):
-                    try:
-                        data, quantity_to_predict, mask = batch
-                    except:
-                        data, quantity_to_predict = batch
-                    # Forward pass
-                    if self.model_class == 'cnn':
-                        outputs = model(data.to(device), mask)
-                    else:
-                        outputs = model(data.to(device))
-                    loss = criterion(outputs, quantity_to_predict.to(device))
+                    data, quantity_to_predict = batch
+                    data = data.to(device)
+                    quantity_to_predict = quantity_to_predict.to(device)
+                    outputs = model(data)
+                    loss = criterion(outputs, quantity_to_predict)
+                    outputs_cpu = outputs.cpu().detach().numpy()
+                    quantity_to_predict_cpu = quantity_to_predict.cpu().detach().numpy()
+                    mse = mean_squared_error(outputs_cpu, quantity_to_predict_cpu)
                     # Backward and optimize
                     optimizer.zero_grad()
                     loss.backward()
                     optimizer.step()
                     train_losses.append(loss.item())
+                    train_mse.append(mse)
 
                 for data, target in validationloader:
                     # forward pass: compute predicted outputs by passing inputs to the model
@@ -319,17 +330,27 @@ class MLDESim():
                     # calculate the loss
                     loss = criterion(output, target.to(device))
                     # record validation loss
+                    output_cpu = output.cpu().detach().numpy()
+                    target_cpu = target.cpu().detach().numpy()
+                    mse = mean_squared_error(output_cpu, target_cpu)
                     valid_losses.append(loss.item())
+                    valid_mse.append(mse)
+                train_mses = np.average(train_mse)
+                valid_mses = np.average(valid_mse)
                 train_loss = np.average(train_losses)
                 valid_loss = np.average(valid_losses)
                 avg_train_losses.append(train_loss)
                 avg_valid_losses.append(valid_loss)
+                avg_train_mses.append(train_mses)
+                avg_valid_mses.append(valid_mses)
 
                 epoch_len = len(str(self.num_epochs))
 
                 print_msg = (f'[{epoch:>{epoch_len}}/{self.num_epochs:>{epoch_len}}] ' +
                              f'average train_loss: {train_loss:.5f} ' +
-                             f'average valid_loss: {valid_loss:.5f}')
+                             f'average valid_loss: {valid_loss:.5f} ' + 
+                             f'average train_mse: {train_mses:.5f} ' + 
+                             f'average valid_mse: {valid_mses:.5f} ')
 
                 print(print_msg)
 
@@ -346,20 +367,14 @@ class MLDESim():
 
         # move the testing and average across all five loops.
         with torch.no_grad():
-            correct = 0
-            total = 0
             label_index = 0
+            final_outputs = np.zeros((self.n_samples, ))
             for data in testloader:
                 outputs = model(data[0].to(device))
                 outputs = outputs.cpu()
-                labels = self.y_test_with_fitness[label_index:label_index +
-                                                  outputs.shape[0]]
-                labels_tensor = torch.Tensor(labels)
-                labels_tensor = labels_tensor.to(device)
-                predicted, _ = torch.max(outputs.data, 1)
-                predicted = predicted.to(device)
-                total += labels_tensor.size(0)
-                correct += (predicted == labels_tensor).sum().item()
+                outputs_numpy_arr = outputs.cpu().detach().numpy()
+                final_outputs[label_index:label_index +
+                                    outputs.shape[0]] = outputs_numpy_arr.flatten()
                 if self.first_append:
                     filename = self.save_path + 'results.csv'
                     delimiter = ','
@@ -373,13 +388,10 @@ class MLDESim():
                     df[self.feat_to_predict] = new_series
                     df.to_csv(self.save_path + 'results.csv', index=False)
                 label_index += outputs.shape[0]
-            print('Accuracy of the network on sequence data: {} %'.format(
-                100 * correct / total))
-
-        # test_rho, test_mse = self.evaluate_model(outputs, self.y_test_with_fitness)
-        # print('test stats: Spearman: %.2f MSE: %.2f ' % (test_rho, test_mse))
-        # plt.figure()
-        # plt.title('predicted (y) vs. labels (x)')
-        # sns.scatterplot(x = self.y_test_with_fitness, y = output, s = 2, alpha = 0.2)
-        # plt.savefig(self.save_path + 'nn_preds_vs_labels.png', dpi = 300)
+        test_rho, test_mse = self.evaluate_model(final_outputs, self.y_test_with_fitness)
+        print('test stats: Spearman: %.2f MSE: %.2f ' % (test_rho, test_mse))
+        plt.figure()
+        plt.title('predicted (y) vs. labels (x)')
+        sns.scatterplot(x = self.y_test_with_fitness, y = final_outputs, s = 2, alpha = 0.2)
+        plt.savefig(self.save_path + 'nn_preds_vs_labels.png', dpi = 300)
         torch.save(model.state_dict(), 'model.ckpt')
