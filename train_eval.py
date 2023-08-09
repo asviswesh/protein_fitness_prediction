@@ -268,21 +268,12 @@ class MLDESim():
             train_subsampler = torch.utils.data.SubsetRandomSampler(train_ids)
             validation_subsampler = torch.utils.data.SubsetRandomSampler(
                 validation_ids)
-
-            if self.model_class == 'cnn':
-                trainloader = torch.utils.data.DataLoader(
-                    total_trainset,
-                    batch_size=10, sampler=train_subsampler)
-                validationloader = torch.utils.data.DataLoader(
-                    total_trainset,
-                    batch_size=10, sampler=validation_subsampler)
-            else:
-                trainloader = torch.utils.data.DataLoader(
-                    total_trainset,
-                    batch_size=10, sampler=train_subsampler)
-                validationloader = torch.utils.data.DataLoader(
-                    total_trainset,
-                    batch_size=10, sampler=validation_subsampler)
+            trainloader = torch.utils.data.DataLoader(
+                total_trainset,
+                batch_size=10, sampler=train_subsampler)
+            validationloader = torch.utils.data.DataLoader(
+                total_trainset,
+                batch_size=10, sampler=validation_subsampler)
 
             train_subsampler = torch.utils.data.SubsetRandomSampler(train_ids)
             validation_subsampler = torch.utils.data.SubsetRandomSampler(
