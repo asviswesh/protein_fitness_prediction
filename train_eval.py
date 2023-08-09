@@ -246,11 +246,20 @@ class MLDESim():
             self.hidden_size1 = 600
             self.hidden_size2 = 30
             model = NeuralNet(self.input_size, self.hidden_size1,
-                            self.hidden_size2, 1).to(device)
-        elif self.model_class == 'cnn':
-            self.num_classes = self.X_train_all.shape[1]
+                              self.hidden_size2, 1).to(device)
+        elif self.model_class == 'cnn v1':
+            self.input_size = self.X_train_all.shape[1]
             self.output_size = 1
-            model = OneDimensionalCNN(self.num_classes, self.output_size).to(device)
+            model = OneDimensionalCNN(
+                self.input_size, self.output_size).to(device)
+        elif self.model_class == 'cnn v2':
+            self.input_size = self.X_train_all.shape[1]
+            self.dropout_prob = 0.25
+            self.hidden_size = 64
+            self.kernel_size = 5
+            self.output_size = 1
+            model = MLDECNN(self.input_size, self.output_size,
+                            self.kernel_size, self.hidden_size, self.dropout_prob).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=self.learning_rate)
 
         kfold = KFold(n_splits=k_folds, shuffle=True)
@@ -269,10 +278,10 @@ class MLDESim():
                     batch_size=10, sampler=validation_subsampler)
             else:
                 trainloader = torch.utils.data.DataLoader(
-                    total_trainset, 
+                    total_trainset,
                     batch_size=10, sampler=train_subsampler)
                 validationloader = torch.utils.data.DataLoader(
-                    total_trainset, 
+                    total_trainset,
                     batch_size=10, sampler=validation_subsampler)
 
             train_subsampler = torch.utils.data.SubsetRandomSampler(train_ids)
@@ -311,7 +320,8 @@ class MLDESim():
                     loss = criterion(outputs, quantity_to_predict)
                     outputs_cpu = outputs.cpu().detach().numpy()
                     quantity_to_predict_cpu = quantity_to_predict.cpu().detach().numpy()
-                    mse = mean_squared_error(outputs_cpu, quantity_to_predict_cpu)
+                    mse = mean_squared_error(
+                        outputs_cpu, quantity_to_predict_cpu)
                     # Backward and optimize
                     optimizer.zero_grad()
                     loss.backward()
@@ -343,8 +353,8 @@ class MLDESim():
 
                 print_msg = (f'[{epoch:>{epoch_len}}/{self.num_epochs:>{epoch_len}}] ' +
                              f'average train_loss: {train_loss:.5f} ' +
-                             f'average valid_loss: {valid_loss:.5f} ' + 
-                             f'average train_mse: {train_mses:.5f} ' + 
+                             f'average valid_loss: {valid_loss:.5f} ' +
+                             f'average train_mse: {train_mses:.5f} ' +
                              f'average valid_mse: {valid_mses:.5f} ')
 
                 print(print_msg)
@@ -369,7 +379,7 @@ class MLDESim():
                 outputs = outputs.cpu()
                 outputs_numpy_arr = outputs.cpu().detach().numpy()
                 final_outputs[label_index:label_index +
-                                    outputs.shape[0]] = outputs_numpy_arr.flatten()
+                              outputs.shape[0]] = outputs_numpy_arr.flatten()
                 if self.first_append:
                     filename = self.save_path + 'results.csv'
                     delimiter = ','
@@ -383,10 +393,12 @@ class MLDESim():
                     df[self.feat_to_predict] = new_series
                     df.to_csv(self.save_path + 'results.csv', index=False)
                 label_index += outputs.shape[0]
-        test_rho, test_mse = self.evaluate_model(final_outputs, self.y_test_with_fitness)
+        test_rho, test_mse = self.evaluate_model(
+            final_outputs, self.y_test_with_fitness)
         print('test stats Rho: %.2f MSE: %.2f ' % (test_rho, test_mse))
         plt.figure()
         plt.title('predicted (y) vs. labels (x)')
-        sns.scatterplot(x = self.y_test_with_fitness, y = final_outputs, s = 2, alpha = 0.2)
-        plt.savefig(self.save_path + 'nn_preds_vs_labels.png', dpi = 300)
+        sns.scatterplot(x=self.y_test_with_fitness,
+                        y=final_outputs, s=2, alpha=0.2)
+        plt.savefig(self.save_path + 'nn_preds_vs_labels.png', dpi=300)
         torch.save(model.state_dict(), 'model.ckpt')
