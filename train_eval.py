@@ -183,7 +183,7 @@ class MLDESim():
             print(self.y_test_with_fitness)
             test_rho, test_mse = self.evaluate_model(
                 y_preds, self.y_test_with_fitness)
-            print('test stats: Spearman: %.2f MSE: %.2f ' %
+            print('test stats Rho: %.2f MSE: %.2f ' %
                   (test_rho, test_mse))
             plt.figure()
             plt.title('predicted (y) vs. labels (x)')
@@ -243,19 +243,14 @@ class MLDESim():
         self.num_epochs = num_epochs
         if self.model_class == 'feed forward':
             self.input_size = self.X_train_all.shape[1]
-            print(self.input_size)
             self.hidden_size1 = 600
             self.hidden_size2 = 30
             model = NeuralNet(self.input_size, self.hidden_size1,
                             self.hidden_size2, 1).to(device)
         elif self.model_class == 'cnn':
-            self.vocab_size = 80
-            self.max_input_size = 1024
-            self.kernel_size = k_folds
-            trainloader = torch.utils.data.DataLoader(
-            total_trainset, batch_size=128, shuffle=True)
-            model = SeqConvNetwork(self.vocab_size, self.max_input_size, self.kernel_size, 
-                                   dropout=0.0).to(device)
+            self.num_classes = self.X_train_all.shape[1]
+            self.output_size = 1
+            model = OneDimensionalCNN(self.num_classes, self.output_size).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=self.learning_rate)
 
         kfold = KFold(n_splits=k_folds, shuffle=True)
@@ -389,7 +384,7 @@ class MLDESim():
                     df.to_csv(self.save_path + 'results.csv', index=False)
                 label_index += outputs.shape[0]
         test_rho, test_mse = self.evaluate_model(final_outputs, self.y_test_with_fitness)
-        print('test stats: Spearman: %.2f MSE: %.2f ' % (test_rho, test_mse))
+        print('test stats Rho: %.2f MSE: %.2f ' % (test_rho, test_mse))
         plt.figure()
         plt.title('predicted (y) vs. labels (x)')
         sns.scatterplot(x = self.y_test_with_fitness, y = final_outputs, s = 2, alpha = 0.2)
