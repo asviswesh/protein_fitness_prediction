@@ -549,7 +549,9 @@ start_time = time.time()
 with open('/home/annika/md_sims/official_extraction/official_config.json') as config_file:
     data = json.load(config_file)
 
-num_residues = data["num_residues"]
+start_residue = data["start_residue"]
+end_residue = data["end_residue"]
+num_residues = end_residue - start_residue + 1
 time_interval = data["time_interval"]
 # Quick assertion check to ensure user gives non-zero time interval value.
 assert time_interval > 0
@@ -567,7 +569,7 @@ num_frames = len(universe.trajectory)
 if time_interval > 1:
     universe.transfer_to_memory(start=time_interval-1, step=time_interval)
 num_timesteps = math.floor(num_frames/time_interval)
-res_list = [i for i in range(1, num_residues + 1)]
+res_list = [i for i in range(start_residue, end_residue + 1)]
 final_arr_x_dim = num_timesteps * num_residues
 final_arr_y_dim = len(feature_list)
 
@@ -580,6 +582,9 @@ rad_gyration_vals = np.zeros((num_residues, num_timesteps))
 all_chi_vals = np.zeros((num_residues, num_timesteps, 4), dtype=object)
 entropy_vals = np.zeros((1, num_residues))
 state_vals = np.zeros((num_residues, num_timesteps))
+mean_pot_energy = np.empty((1,))
+var_pot_energy = np.empty((1,))
+calculated_mean_var = False
 final_frame = np.empty((final_arr_x_dim, final_arr_y_dim), dtype=object)
 
 if not new_csv:
@@ -722,10 +727,22 @@ def calculate_entropy(res_list):
     chi3_index = 0
     chi4_index = 0
 
-    chi1_dihedrals = obtain_dihedral_angles(chi1_list, chi1_index_list)
-    chi2_dihedrals = obtain_dihedral_angles(chi2_list, chi2_index_list)
-    chi3_dihedrals = obtain_dihedral_angles(chi3_list, chi3_index_list)
-    chi4_dihedrals = obtain_dihedral_angles(chi4_list, chi4_index_list)
+    try:
+        chi1_dihedrals = obtain_dihedral_angles(chi1_list, chi1_index_list)
+    except:
+        pass
+    try:
+        chi2_dihedrals = obtain_dihedral_angles(chi2_list, chi2_index_list)
+    except:
+        pass
+    try:
+        chi3_dihedrals = obtain_dihedral_angles(chi3_list, chi3_index_list)
+    except:
+        pass
+    try:
+        chi4_dihedrals = obtain_dihedral_angles(chi4_list, chi4_index_list)
+    except:
+        pass
 
     for m in range(len(res_list)):
         res_sel = select_residue(universe, res_list[m])
@@ -816,10 +833,22 @@ def obtain_entropy_state(res_list):
     chi3_index = 0
     chi4_index = 0
 
-    chi1_dihedrals = obtain_dihedral_angles(chi1_list, chi1_index_list)
-    chi2_dihedrals = obtain_dihedral_angles(chi2_list, chi2_index_list)
-    chi3_dihedrals = obtain_dihedral_angles(chi3_list, chi3_index_list)
-    chi4_dihedrals = obtain_dihedral_angles(chi4_list, chi4_index_list)
+    try:
+        chi1_dihedrals = obtain_dihedral_angles(chi1_list, chi1_index_list)
+    except:
+        pass
+    try:
+        chi2_dihedrals = obtain_dihedral_angles(chi2_list, chi2_index_list)
+    except:
+        pass
+    try:
+        chi3_dihedrals = obtain_dihedral_angles(chi3_list, chi3_index_list)
+    except:
+        pass
+    try:
+        chi4_dihedrals = obtain_dihedral_angles(chi4_list, chi4_index_list)
+    except:
+        pass
 
     for m in range(len(res_list)):
         res_sel = select_residue(universe, res_list[m])
@@ -913,10 +942,22 @@ def obtain_chi_angles(res_list):
     chi3_index = 0
     chi4_index = 0
 
-    chi1_dihedrals = obtain_dihedral_angles(chi1_list, chi1_index_list)
-    chi2_dihedrals = obtain_dihedral_angles(chi2_list, chi2_index_list)
-    chi3_dihedrals = obtain_dihedral_angles(chi3_list, chi3_index_list)
-    chi4_dihedrals = obtain_dihedral_angles(chi4_list, chi4_index_list)
+    try:
+        chi1_dihedrals = obtain_dihedral_angles(chi1_list, chi1_index_list)
+    except:
+        pass
+    try:
+        chi2_dihedrals = obtain_dihedral_angles(chi2_list, chi2_index_list)
+    except:
+        pass
+    try:
+        chi3_dihedrals = obtain_dihedral_angles(chi3_list, chi3_index_list)
+    except:
+        pass
+    try:
+        chi4_dihedrals = obtain_dihedral_angles(chi4_list, chi4_index_list)
+    except:
+        pass
 
     for m in range(len(res_list)):
         res_sel = select_residue(universe, res_list[m])
@@ -1028,6 +1069,9 @@ def obtain_z_coords(coords_arr, final_index_to_update):
 
 
 def obtain_mean_var_potential_energies(log_file):
+    global mean_pot_energy, var_pot_energy, calculated_mean_var
+    if calculated_mean_var:
+        return (mean_pot_energy, var_pot_energy)
     potential_energy_list = []
     with open(log_file, 'r') as md_logfile:
         for line in md_logfile:
@@ -1035,7 +1079,9 @@ def obtain_mean_var_potential_energies(log_file):
                 potential_energy_val = float(list(line.split(','))[1])
                 potential_energy_list.append(potential_energy_val)
     np_pot_energy_list = np.asarray(potential_energy_list)
-    return (np.mean(np_pot_energy_list), np.var(np_pot_energy_list))
+    mean_pot_energy = np.mean(np_pot_energy_list)
+    var_pot_energy = np.var(np_pot_energy_list)
+    return (mean_pot_energy, var_pot_energy)
 
 
 def place_res_nums(res_list, final_index_to_update):
@@ -1113,19 +1159,19 @@ def place_chi4_vals(res_list, final_index_to_update):
 
 
 def place_mean_pot_energy(res_list, final_index_to_update):
+    mean_pot_energy_value =  obtain_mean_var_potential_energies(log_file_path)[0]
     for j in range(len(res_list)):
         for k in range(num_timesteps):
             index_to_place = j * num_timesteps + k
-            final_frame[index_to_place, final_index_to_update] = obtain_mean_var_potential_energies(log_file_path)[
-                0]
+            final_frame[index_to_place, final_index_to_update] = mean_pot_energy_value
 
 
 def place_var_pot_energy(res_list, final_index_to_update):
+    var_pot_energy_value = obtain_mean_var_potential_energies(log_file_path)[1]
     for j in range(len(res_list)):
         for k in range(num_timesteps):
             index_to_place = j * num_timesteps + k
-            final_frame[index_to_place, final_index_to_update] = obtain_mean_var_potential_energies(log_file_path)[
-                1]
+            final_frame[index_to_place, final_index_to_update] = var_pot_energy_value
 
 
 def place_rad_gyration_vals(rad_array, final_index_to_update):
@@ -1165,6 +1211,7 @@ cols_to_funcs_dict = {"Residue": [place_res_nums, res_list],
 
 def extract_md_features(feat_list):
     for i in range(len(feat_list)):
+        print(f"Working on extracting {feat_list[i]}")
         if cols_to_funcs_dict.get(feat_list[i])[0].__name__ == 'calc_disp_diff_array':
             cols_to_funcs_dict[feat_list[i]][0](
                 cols_to_funcs_dict[feat_list[i]][1], cols_to_funcs_dict[feat_list[i]][2], i)
