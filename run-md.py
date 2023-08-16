@@ -14,9 +14,6 @@ modeller.addSolvent(forcefield, padding=1.0*nanometers)
 system = forcefield.createSystem(
     modeller.topology, nonbondedMethod=PME, nonbondedCutoff=1 * nanometer, constraints=HBonds
 )
-# Apply pressure barometrization to create constant pressure within the solvent environment.
-barostat = MonteCarloBarostat(1.0*bar, 300*kelvin)
-system.addForce(barostat)
 integrator = LangevinMiddleIntegrator(300 * kelvin, 1 / picosecond, 0.002 * picoseconds)
 
 simulation = Simulation(modeller.topology, system, integrator)
@@ -32,7 +29,7 @@ print("Starting simulation...")
 
 print("Starting NVT equilibration...")
 
-simulation.context.setVelocitiesToTemperature(300*kelvin)
+# simulation.context.setVelocitiesToTemperature(300*kelvin)
 print("Running for {} steps, ({} ps)".format(10000, 10000 * 0.002))
 simulation.reporters.append(DCDReporter("nvt_equilibration.dcd", 1000))
 simulation.reporters.append(StateDataReporter(stdout, 1000, step=True, potentialEnergy=True, temperature=True))
@@ -43,6 +40,10 @@ simulation.step(10000)
 # pressure, and temperature are kept constant.
 print("Starting NPT equilibration...")
 simulation.reporters.clear()
+# Apply pressure barometrization to create constant pressure within the solvent environment.
+barostat = MonteCarloBarostat(1.0*bar, 300*kelvin)
+system.addForce(barostat)
+simulation.context.reintialize(preserveState=True)
 simulation.reporters.append(DCDReporter("npt_equilibration.dcd", 1000))
 simulation.reporters.append(StateDataReporter(stdout, 1000, step=True, potentialEnergy=True, temperature=True))
 # Run for 10000 steps, which is 20 ps.
@@ -68,5 +69,3 @@ PDBFile.writeFile(simulation.topology, simulation.context.getState(getPositions=
 end_time = time.time()
 
 print("Elapsed time: %.2f seconds" % (end_time - start_time))
-
-
