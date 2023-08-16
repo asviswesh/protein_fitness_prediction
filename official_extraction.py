@@ -2,11 +2,13 @@ from collections import Counter
 import MDAnalysis as mda
 from MDAnalysis.analysis import align
 from MDAnalysis.analysis.dihedrals import Dihedral
+from MDAnalysis import transformations
 import csv
 import json
 import os
 import math
 import numpy as np
+import sys
 import time
 
 
@@ -489,34 +491,32 @@ def select_residue(uni, res_num):
     return residue
 
 
-def protein_coords_final_frame(uni):
-    for ts in uni.trajectory[-1]:
-        protein_atoms = uni.select_atoms("protein")
-        return protein_atoms.centroid()
-
-
 def center_protein_in_box(uni):
-    # Select the protein atoms
-    protein_atoms = uni.select_atoms("protein")
-    with mda.Writer("/home/annika/md_sims/official_extraction/no_in_memory_center.dcd", len(uni.atoms)) as dcd_writer:
-        centroid = protein_coords_final_frame(uni)
+    with mda.Writer("/home/annika/md_sims/official_extraction/20_ns_sims_new/new_no_in_memory_center20.dcd", len(uni.atoms)) as dcd_writer:
         for ts in uni.trajectory:
+            print(f"currently on timestep {ts.frame}")
+            uni_atoms = uni.select_atoms("all")
+            protein_atoms = uni.select_atoms("protein")
+            ag = uni.atoms
+            mda.transformations.unwrap(ag)
+            centroid = protein_atoms.centroid()
             # Obtain box vectors and calculate center of solvent box.
             box_vectors = ts.triclinic_dimensions
             box_center = np.sum(box_vectors, axis=0) / 2
             translation = box_center - centroid
             # Move the protein to the center of solvent box.
             protein_atoms.translate(translation)
-            protein_atoms.wrap()
             # Write coordinates to the file.
             dcd_writer.write(uni.atoms)
     print("Everything is centered in the box.")
+
+# Minimizing RMSD.
 
 
 def superimpose_to_last_frame(uni, ref_uni, top_file):
     for ts in uni.trajectory[-1]:
         for ts in ref_uni.trajectory[-1]:
-            mod_traj_filename = '/home/annika/md_sims/adding_superimposition.dcd'
+            mod_traj_filename = '/home/annika/md_sims/official_extraction/20_ns_sims_new/adding_new_wrap_superimposition_20.dcd'
             # Setting select='protein' reduces diffusion.
             aligner = align.AlignTraj(
                 uni, ref_uni, select='protein', filename=mod_traj_filename).run()
@@ -537,16 +537,18 @@ def obtain_dihedral_angles(atom_list, res_num_list):
 
 # Paths to obtain all MD related files for feature extraction
 base_md_file_path = '/home/annika/md_sims/'
-md_base_filepath = f'{base_md_file_path}official_extraction/new_md_results/'
-log_file_path = f'{md_base_filepath}prod.log'
-trajectory_file_path = f'{md_base_filepath}prod.dcd'
-topology_file_path = f'{md_base_filepath}end.pdb'
+md_base_filepath = f'{base_md_file_path}official_extraction/20_ns_sims_new/'
+log_file_path = f'{md_base_filepath}prod_20ns.log'
+trajectory_file_path = f'{md_base_filepath}prod_20ns.dcd'
+topology_file_path = f'{md_base_filepath}end_20ns.pdb'
 
 # Recording start time.
 start_time = time.time()
 
 # Loading data from JSON File
-with open('/home/annika/md_sims/official_extraction/official_config.json') as config_file:
+json_filename = sys.argv[1]
+# with open('/home/annika/md_sims/official_extraction/official_config.json') as config_file:
+with open(json_filename) as config_file:
     data = json.load(config_file)
 
 start_residue = data["start_residue"]
@@ -564,12 +566,15 @@ new_csv = data["new_csv"]
 real_feat_list = []
 
 universe = mda.Universe(topology_file_path, trajectory_file_path)
+protein = universe.select_atoms("protein")
+protein.guess_bonds()
 num_frames = len(universe.trajectory)
-# Obtaining simplified universe with every 125th timestep.
+# Obtaining simplified universe based on timestep collection.
 if time_interval > 1:
     universe.transfer_to_memory(start=time_interval-1, step=time_interval)
 num_timesteps = math.floor(num_frames/time_interval)
 res_list = [i for i in range(start_residue, end_residue + 1)]
+print(f"List of residues is: {res_list}")
 final_arr_x_dim = num_timesteps * num_residues
 final_arr_y_dim = len(feature_list)
 
@@ -647,7 +652,7 @@ start_center_time = time.time()
 if data["center"]:
     center_protein_in_box(universe)
     universe = mda.Universe(
-        topology_file_path, '/home/annika/md_sims/official_extraction/no_in_memory_center.dcd')
+        topology_file_path, '/home/annika/md_sims/official_extraction/20_ns_sims_new/new_no_in_memory_center20.dcd')
 print(f"Centering time is : {time.time() - start_center_time}")
 start_superimpose_time = time.time()
 if data["superimpose"]:
@@ -1081,6 +1086,7 @@ def obtain_mean_var_potential_energies(log_file):
     np_pot_energy_list = np.asarray(potential_energy_list)
     mean_pot_energy = np.mean(np_pot_energy_list)
     var_pot_energy = np.var(np_pot_energy_list)
+    calculated_mean_var = True
     return (mean_pot_energy, var_pot_energy)
 
 
@@ -1088,7 +1094,7 @@ def place_res_nums(res_list, final_index_to_update):
     for j in range(len(res_list)):
         for k in range(num_timesteps):
             index_to_place = j * num_timesteps + k
-            res_num = j + 1
+            res_num = res_list[j]
             final_frame[index_to_place, final_index_to_update] = res_num
 
 
@@ -1124,7 +1130,8 @@ def place_state_vals(res_list, final_index_to_update):
             index_to_place = j * num_timesteps + k
             final_frame[index_to_place,
                         final_index_to_update] = state_arr[j, k]
-            
+
+
 def place_chi1_vals(res_list, final_index_to_update):
     chi_arr = obtain_chi_angles(res_list)
     for j in range(len(res_list)):
@@ -1133,6 +1140,7 @@ def place_chi1_vals(res_list, final_index_to_update):
             final_frame[index_to_place,
                         final_index_to_update] = chi_arr[j, k, 0]
 
+
 def place_chi2_vals(res_list, final_index_to_update):
     chi_arr = obtain_chi_angles(res_list)
     for j in range(len(res_list)):
@@ -1140,7 +1148,8 @@ def place_chi2_vals(res_list, final_index_to_update):
             index_to_place = j * num_timesteps + k
             final_frame[index_to_place,
                         final_index_to_update] = chi_arr[j, k, 1]
-            
+
+
 def place_chi3_vals(res_list, final_index_to_update):
     chi_arr = obtain_chi_angles(res_list)
     for j in range(len(res_list)):
@@ -1148,6 +1157,7 @@ def place_chi3_vals(res_list, final_index_to_update):
             index_to_place = j * num_timesteps + k
             final_frame[index_to_place,
                         final_index_to_update] = chi_arr[j, k, 2]
+
 
 def place_chi4_vals(res_list, final_index_to_update):
     chi_arr = obtain_chi_angles(res_list)
@@ -1159,11 +1169,13 @@ def place_chi4_vals(res_list, final_index_to_update):
 
 
 def place_mean_pot_energy(res_list, final_index_to_update):
-    mean_pot_energy_value =  obtain_mean_var_potential_energies(log_file_path)[0]
+    mean_pot_energy_value = obtain_mean_var_potential_energies(log_file_path)[
+        0]
     for j in range(len(res_list)):
         for k in range(num_timesteps):
             index_to_place = j * num_timesteps + k
-            final_frame[index_to_place, final_index_to_update] = mean_pot_energy_value
+            final_frame[index_to_place,
+                        final_index_to_update] = mean_pot_energy_value
 
 
 def place_var_pot_energy(res_list, final_index_to_update):
@@ -1171,7 +1183,8 @@ def place_var_pot_energy(res_list, final_index_to_update):
     for j in range(len(res_list)):
         for k in range(num_timesteps):
             index_to_place = j * num_timesteps + k
-            final_frame[index_to_place, final_index_to_update] = var_pot_energy_value
+            final_frame[index_to_place,
+                        final_index_to_update] = var_pot_energy_value
 
 
 def place_rad_gyration_vals(rad_array, final_index_to_update):
