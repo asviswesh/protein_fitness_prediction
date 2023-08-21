@@ -152,7 +152,8 @@ class Residue:
         chi2_angle = three_state_library.get(chi2_index).get('chi2')
         chi3_angle = three_state_library.get(chi3_index).get('chi3')
         temp_chi_dict = {'chi1': chi1_angle,
-                         'chi2': chi2_angle, 'chi3': chi3_angle}
+                         'chi2': chi2_angle, 
+                         'chi3': chi3_angle}
         state_val = [
             i for i in three_state_library if three_state_library[i] == temp_chi_dict]
         return state_val[0]
@@ -185,7 +186,9 @@ class Residue:
         chi3_angle = four_state_library.get(chi3_index).get('chi3')
         chi4_angle = four_state_library.get(chi4_index).get('chi4')
         temp_chi_dict = {'chi1': chi1_angle,
-                         'chi2': chi2_angle, 'chi3': chi3_angle, 'chi4': chi4_angle}
+                         'chi2': chi2_angle, 
+                         'chi3': chi3_angle,
+                         'chi4': chi4_angle}
         state_val = [
             i for i in four_state_library if four_state_library[i] == temp_chi_dict]
         return state_val[0]
@@ -495,7 +498,6 @@ def center_protein_in_box(uni):
     with mda.Writer("/home/annika/md_sims/official_extraction/20_ns_sims_new/new_no_in_memory_center20.dcd", len(uni.atoms)) as dcd_writer:
         for ts in uni.trajectory:
             print(f"currently on timestep {ts.frame}")
-            uni_atoms = uni.select_atoms("all")
             protein_atoms = uni.select_atoms("protein")
             ag = uni.atoms
             mda.transformations.unwrap(ag)
@@ -510,9 +512,8 @@ def center_protein_in_box(uni):
             dcd_writer.write(uni.atoms)
     print("Everything is centered in the box.")
 
+
 # Minimizing RMSD.
-
-
 def superimpose_to_last_frame(uni, ref_uni, top_file):
     for ts in uni.trajectory[-1]:
         for ts in ref_uni.trajectory[-1]:
