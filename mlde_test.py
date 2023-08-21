@@ -12,5 +12,8 @@ mlde_sim = MLDESim(save_path=save_path_base,
                    first_append=True, 
                    feat_to_predict='Fitness', 
                    neural_network=True)
-mlde_sim.train_all()
-# mlde_sim.run_neural_network(learning_rate=1e-3, num_epochs=23)
+
+if 'feed' or 'cnn' in mlde_sim.model_class:
+    mlde_sim.run_neural_network(learning_rate=1e-3, num_epochs=23)
+else: 
+    mlde_sim.train_all()
