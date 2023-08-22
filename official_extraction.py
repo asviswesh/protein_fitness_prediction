@@ -518,7 +518,6 @@ def superimpose_to_last_frame(uni, ref_uni, top_file):
     for ts in uni.trajectory[-1]:
         for ts in ref_uni.trajectory[-1]:
             mod_traj_filename = '/home/annika/md_sims/official_extraction/20_ns_sims_new/adding_new_wrap_superimposition_20.dcd'
-            # Setting select='protein' reduces diffusion.
             aligner = align.AlignTraj(
                 uni, ref_uni, select='protein', filename=mod_traj_filename).run()
             uni = mda.Universe(top_file, mod_traj_filename)
@@ -552,7 +551,6 @@ parser.add_argument("json_filename")
 args = parser.parse_args()
 
 json_filename = args.json_filename
-# with open('/home/annika/md_sims/official_extraction/official_config.json') as config_file:
 with open(json_filename) as config_file:
     data = json.load(config_file)
 
@@ -1248,8 +1246,10 @@ def extract_md_features(feat_list):
 
 if new_csv:
     extract_md_features(feature_list)
-    np.savetxt(data["new_csv_name"], final_frame, delimiter=',',
-               header=create_header_string(feature_list), fmt='%s')
+    np.savetxt(data["new_csv_name"], 
+               final_frame, delimiter=',',
+               header=create_header_string(feature_list), 
+               fmt='%s')
 else:
     extract_md_features(real_feat_list)
     csv_to_add = find_csv_path('/home/annika/md_sims/official_extraction/')
@@ -1259,8 +1259,11 @@ else:
         get_rows_for_csv(csv_to_add)).replace(" ", "")
     existing_data = np.loadtxt(csv_to_add, delimiter=',', dtype=object)
     updated_data = np.concatenate((existing_data, final_frame), axis=1)
-    np.savetxt(csv_to_add, updated_data, delimiter=',',
-               header=create_header_string(new_header_list), fmt='%s')
+    np.savetxt(csv_to_add, 
+               updated_data, 
+               delimiter=',',
+               header=create_header_string(new_header_list), 
+               fmt='%s')
 
 time_dep_frame = pd.read_csv(data["new_csv_name"])
 counter = 0
@@ -1291,9 +1294,11 @@ counter += 1
 feature_set[0, counter] = np.var(np.asarray(
     res_frame[' Radius of Gyration']), axis=0)
 
-# TODO: change .csv pathname to be including the md_mutant_name.
-np.savetxt('/home/annika/md_sims/official_extraction/test2.csv', feature_set, delimiter=',',
-           header=create_header_string(real_feature_list), fmt='%s')
+np.savetxt(f'/home/annika/md_sims/official_extraction/{data["md_mutant_name"]}.csv',
+           feature_set,
+           delimiter=',',
+           header=create_header_string(real_feature_list),
+           fmt='%s')
 
 print("Feature .csv file saved.")
 
