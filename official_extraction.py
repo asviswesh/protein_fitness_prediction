@@ -8,6 +8,7 @@ import json
 import os
 import math
 import numpy as np
+import pandas as pd
 import sys
 import time
 
@@ -152,7 +153,7 @@ class Residue:
         chi2_angle = three_state_library.get(chi2_index).get('chi2')
         chi3_angle = three_state_library.get(chi3_index).get('chi3')
         temp_chi_dict = {'chi1': chi1_angle,
-                         'chi2': chi2_angle, 
+                         'chi2': chi2_angle,
                          'chi3': chi3_angle}
         state_val = [
             i for i in three_state_library if three_state_library[i] == temp_chi_dict]
@@ -186,7 +187,7 @@ class Residue:
         chi3_angle = four_state_library.get(chi3_index).get('chi3')
         chi4_angle = four_state_library.get(chi4_index).get('chi4')
         temp_chi_dict = {'chi1': chi1_angle,
-                         'chi2': chi2_angle, 
+                         'chi2': chi2_angle,
                          'chi3': chi3_angle,
                          'chi4': chi4_angle}
         state_val = [
@@ -497,7 +498,6 @@ def select_residue(uni, res_num):
 def center_protein_in_box(uni):
     with mda.Writer("/home/annika/md_sims/official_extraction/20_ns_sims_new/new_no_in_memory_center20.dcd", len(uni.atoms)) as dcd_writer:
         for ts in uni.trajectory:
-            print(f"currently on timestep {ts.frame}")
             protein_atoms = uni.select_atoms("protein")
             ag = uni.atoms
             mda.transformations.unwrap(ag)
@@ -556,6 +556,7 @@ start_residue = data["start_residue"]
 end_residue = data["end_residue"]
 num_residues = end_residue - start_residue + 1
 time_interval = data["time_interval"]
+feature_list = data["features"]
 # Quick assertion check to ensure user gives non-zero time interval value.
 assert time_interval > 0
 feature_list = data["features"]
@@ -572,10 +573,10 @@ protein.guess_bonds()
 num_frames = len(universe.trajectory)
 # Obtaining simplified universe based on timestep collection.
 if time_interval > 1:
-    universe.transfer_to_memory(start=time_interval-1, step=time_interval)
+    universe.transfer_to_memory(start=0, stop=len(
+        universe.trajectory) + 1, step=time_interval)
+    # universe.transfer_to_memory(start=time_interval-1, step=time_interval)
 num_timesteps = math.floor(num_frames/time_interval)
-res_list = [i for i in range(start_residue, end_residue + 1)]
-print(f"List of residues is: {res_list}")
 final_arr_x_dim = num_timesteps * num_residues
 final_arr_y_dim = len(feature_list)
 
@@ -592,6 +593,23 @@ mean_pot_energy = np.empty((1,))
 var_pot_energy = np.empty((1,))
 calculated_mean_var = False
 final_frame = np.empty((final_arr_x_dim, final_arr_y_dim), dtype=object)
+
+final_features = feature_list[3:len(feature_list) - 4]
+num_residues = end_residue - start_residue + 1
+feature_set = len(final_features) * num_residues * 2 + 5
+feature_set = np.zeros((1, feature_set), dtype=object)
+res_list = [i for i in range(start_residue, end_residue + 1)]
+real_feature_list = ['Mutant name']
+for i in range(len(res_list)):
+    for feature in final_features:
+        mean_string = 'Mean' + feature + f' Residue {res_list[i]}'
+        variance_string = 'Variance' + feature + f' Residue {res_list[i]}'
+        real_feature_list.append(mean_string)
+        real_feature_list.append(variance_string)
+real_feature_list.append("Mean Potential Energy")
+real_feature_list.append("Variation Potential Energy")
+real_feature_list.append("Mean Radius of Gyration")
+real_feature_list.append("Variance in Radius of Gyration")
 
 if not new_csv:
     real_feat_list = obtain_cols_to_add(
@@ -649,20 +667,15 @@ one_letter_rep_dict = {
 }
 
 # Performing centering and alignment respectively.
-start_center_time = time.time()
 if data["center"]:
     center_protein_in_box(universe)
     universe = mda.Universe(
         topology_file_path, '/home/annika/md_sims/official_extraction/20_ns_sims_new/new_no_in_memory_center20.dcd')
-print(f"Centering time is : {time.time() - start_center_time}")
-start_superimpose_time = time.time()
 if data["superimpose"]:
     universe = superimpose_to_last_frame(
         universe, universe, topology_file_path)
-print(f"Superimposition time is : {time.time() - start_superimpose_time}")
 
 time_index = 0
-start_basic_time = time.time()
 for ts in universe.trajectory:
     for i in range(len(res_list)):
         res_sel = select_residue(universe, res_list[i])
@@ -683,12 +696,9 @@ for ts in universe.trajectory:
                                      :] = res_obj.get_furthest_position()
         rad_gyration_vals[i, time_index] = res_obj.rad_of_gyration
     time_index += 1
-print(
-    f"Time to collect all position/gyration values is: {time.time() - start_basic_time} ")
 
 
 def calculate_entropy(res_list):
-    start_entropy_time = time.time()
     chi1_list = []
     chi2_list = []
     chi3_list = []
@@ -787,14 +797,10 @@ def calculate_entropy(res_list):
             chi2_index += 1
             chi3_index += 1
             chi4_index += 1
-    print("Finished entropy calculations")
-    print(
-        f"Time taken for entropy calculations: {time.time() - start_entropy_time}")
     return entropy_vals
 
 
 def obtain_entropy_state(res_list):
-    start_state_time = time.time()
     chi1_list = []
     chi2_list = []
     chi3_list = []
@@ -897,9 +903,6 @@ def obtain_entropy_state(res_list):
             chi2_index += 1
             chi3_index += 1
             chi4_index += 1
-    print("Obtained respective state values")
-    print(
-        f"Time taken for state calculations: {time.time() - start_state_time}")
     return state_vals
 
 
@@ -1111,7 +1114,8 @@ def place_ts_intervals(res_list, final_index_to_update):
     for j in range(len(res_list)):
         for k in range(num_timesteps):
             index_to_place = j * num_timesteps + k
-            ts_interval = (k + 1) * time_interval
+            ts_interval = (k) * time_interval
+            # ts_interval = (k + 1) * time_interval
             final_frame[index_to_place, final_index_to_update] = ts_interval
 
 
@@ -1249,6 +1253,33 @@ else:
     updated_data = np.concatenate((existing_data, final_frame), axis=1)
     np.savetxt(csv_to_add, updated_data, delimiter=',',
                header=create_header_string(new_header_list), fmt='%s')
+
+time_dep_frame = pd.read_csv(data["new_csv_name"])
+counter = 0
+feature_set[0, counter] = data["md_mutant_name"]
+counter += 1
+for i in range(len(res_list)):
+    res_frame = time_dep_frame[time_dep_frame['# Residue'] == res_list[i]]
+    for j in range(len(final_features)):
+        feature_set[0, counter] = np.mean(
+            np.asarray(res_frame[final_features[j]]), axis=0)
+        counter += 1
+        feature_set[0, counter] = np.var(
+            np.asarray(res_frame[final_features[j]]), axis=0)
+        counter += 1
+res_frame = time_dep_frame[time_dep_frame['# Residue'] == (start_residue)]
+feature_set[0, counter] = res_frame[' Mean Potential Energy'][0]
+counter += 1
+feature_set[0, counter] = res_frame[' Variance in Potential Energy'][0]
+counter += 1
+feature_set[0, counter] = np.mean(np.asarray(
+    res_frame[' Radius of Gyration']), axis=0)
+counter += 1
+feature_set[0, counter] = np.var(np.asarray(
+    res_frame[' Radius of Gyration']), axis=0)
+
+np.savetxt('/home/annika/md_sims/official_extraction/test.csv', feature_set, delimiter=',',
+           header=create_header_string(real_feature_list), fmt='%s')
 
 print("Feature .csv file saved.")
 
