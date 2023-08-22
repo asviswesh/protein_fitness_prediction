@@ -1,15 +1,15 @@
 from collections import Counter
-import MDAnalysis as mda
 from MDAnalysis.analysis import align
 from MDAnalysis.analysis.dihedrals import Dihedral
 from MDAnalysis import transformations
+import argparse
 import csv
 import json
 import os
 import math
+import MDAnalysis as mda
 import numpy as np
 import pandas as pd
-import sys
 import time
 
 
@@ -547,7 +547,11 @@ topology_file_path = f'{md_base_filepath}end_20ns.pdb'
 start_time = time.time()
 
 # Loading data from JSON File
-json_filename = sys.argv[1]
+parser = argparse.ArgumentParser()
+parser.add_argument("json_filename")
+args = parser.parse_args()
+
+json_filename = args.json_filename
 # with open('/home/annika/md_sims/official_extraction/official_config.json') as config_file:
 with open(json_filename) as config_file:
     data = json.load(config_file)
@@ -602,10 +606,14 @@ res_list = [i for i in range(start_residue, end_residue + 1)]
 real_feature_list = ['Mutant name']
 for i in range(len(res_list)):
     for feature in final_features:
-        mean_string = 'Mean' + feature + f' Residue {res_list[i]}'
-        variance_string = 'Variance' + feature + f' Residue {res_list[i]}'
-        real_feature_list.append(mean_string)
-        real_feature_list.append(variance_string)
+        if 'Entropy' in feature:
+            feat_string = f'Entropy Residue {res_list[i]}'
+            real_feature_list.append(feat_string)
+        else:
+            mean_string = 'Mean' + feature + f' Residue {res_list[i]}'
+            variance_string = 'Variance' + feature + f' Residue {res_list[i]}'
+            real_feature_list.append(mean_string)
+            real_feature_list.append(variance_string)
 real_feature_list.append("Mean Potential Energy")
 real_feature_list.append("Variation Potential Energy")
 real_feature_list.append("Mean Radius of Gyration")
@@ -1261,12 +1269,17 @@ counter += 1
 for i in range(len(res_list)):
     res_frame = time_dep_frame[time_dep_frame['# Residue'] == res_list[i]]
     for j in range(len(final_features)):
-        feature_set[0, counter] = np.mean(
-            np.asarray(res_frame[final_features[j]]), axis=0)
-        counter += 1
-        feature_set[0, counter] = np.var(
-            np.asarray(res_frame[final_features[j]]), axis=0)
-        counter += 1
+        if 'Entropy' in final_features:
+            feature_set[0, counter] = np.mean(
+                np.asarray(res_frame[final_features[j]]), axis=0)
+            counter += 1
+        else:
+            feature_set[0, counter] = np.mean(
+                np.asarray(res_frame[final_features[j]]), axis=0)
+            counter += 1
+            feature_set[0, counter] = np.var(
+                np.asarray(res_frame[final_features[j]]), axis=0)
+            counter += 1
 res_frame = time_dep_frame[time_dep_frame['# Residue'] == (start_residue)]
 feature_set[0, counter] = res_frame[' Mean Potential Energy'][0]
 counter += 1
@@ -1278,7 +1291,8 @@ counter += 1
 feature_set[0, counter] = np.var(np.asarray(
     res_frame[' Radius of Gyration']), axis=0)
 
-np.savetxt('/home/annika/md_sims/official_extraction/test.csv', feature_set, delimiter=',',
+# TODO: change .csv pathname to be including the md_mutant_name.
+np.savetxt('/home/annika/md_sims/official_extraction/test2.csv', feature_set, delimiter=',',
            header=create_header_string(real_feature_list), fmt='%s')
 
 print("Feature .csv file saved.")
