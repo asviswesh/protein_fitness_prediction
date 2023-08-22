@@ -598,8 +598,6 @@ final_frame = np.empty((final_arr_x_dim, final_arr_y_dim), dtype=object)
 
 final_features = feature_list[3:len(feature_list) - 4]
 num_residues = end_residue - start_residue + 1
-feature_set = len(final_features) * num_residues * 2 + 5
-feature_set = np.zeros((1, feature_set), dtype=object)
 res_list = [i for i in range(start_residue, end_residue + 1)]
 real_feature_list = ['Mutant name']
 for i in range(len(res_list)):
@@ -616,6 +614,9 @@ real_feature_list.append("Mean Potential Energy")
 real_feature_list.append("Variation Potential Energy")
 real_feature_list.append("Mean Radius of Gyration")
 real_feature_list.append("Variance in Radius of Gyration")
+
+feature_set_length = len(real_feature_list)
+feature_set = np.zeros((1, feature_set_length), dtype=object)
 
 if not new_csv:
     real_feat_list = obtain_cols_to_add(
@@ -1272,17 +1273,15 @@ counter += 1
 for i in range(len(res_list)):
     res_frame = time_dep_frame[time_dep_frame['# Residue'] == res_list[i]]
     for j in range(len(final_features)):
-        if 'Entropy' in final_features:
-            feature_set[0, counter] = np.mean(
-                np.asarray(res_frame[final_features[j]]), axis=0)
+        if 'Entropy' in final_features[j]:
+            feature_set[0, counter] = np.asarray(res_frame[final_features[j]])[0]
             counter += 1
         else:
             feature_set[0, counter] = np.mean(
                 np.asarray(res_frame[final_features[j]]), axis=0)
-            counter += 1
-            feature_set[0, counter] = np.var(
+            feature_set[0, counter + 1] = np.var(
                 np.asarray(res_frame[final_features[j]]), axis=0)
-            counter += 1
+            counter += 2
 res_frame = time_dep_frame[time_dep_frame['# Residue'] == (start_residue)]
 feature_set[0, counter] = res_frame[' Mean Potential Energy'][0]
 counter += 1
