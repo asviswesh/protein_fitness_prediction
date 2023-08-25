@@ -2,6 +2,8 @@
 
 This repository contains the code used to generate relevant feature data based on Molecular Dynamics simulation runs and machine learning baseline tests based on one-hot encoded sequence data.
 
+---
+
 Below is an explanation of each of the files presented in this repository <br />
 
 **create_json_mutant.py** - Creates a custom .json configuration file for feature extraction based on .pdb TRIAD file one wishes to extract MD-related features on. <br />
