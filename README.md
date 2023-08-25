@@ -1,6 +1,6 @@
 # Leveraging Structural and Biophysical Information for Machine Learning-Assisted Protein Engineering
 
-This repository contains the code used to generate relevant feature data based on Molecular Dynamics simulation runs and machine learning baseline tests based on one-hot encoded sequence data.
+This repository contains the code used to generate relevant feature data based on Molecular Dynamics simulation runs and machine learning baseline tests based on one-hot encoded sequence data. Research conducted under Professor Frances Arnold (Caltech).
 
 ---
 
