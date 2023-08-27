@@ -26,7 +26,7 @@ To generate a dataset for a customized mutant, run the following
 ```bash
 python3 official_extraction.py [json_configuration_file]
 ```
-**pytorch_models.py** - Contains custom neural network models for machine learning baseline tests. Currently has two implementations of a convolutional neural network and a feed forward neural network.
+**pytorch_models.py** - Contains custom neural network models for machine learning baseline tests. Currently has two implementations of a convolutional neural network and a feed forward neural network. The convolutional neural networks created are both one-dimensional. One of the convolutional neural networks has an architecture that contains max pooling, while the other contains an architecture that includes flattening and dropout probabilities.
 
 **run-md.py** - Runs a 20 nanosecond (production step time) molecular dynamics simulation for a custom protein, and generates relevant files for the feature extraction pipeline.
 To generate a dataset for a customized mutant, run the following
