@@ -1,4 +1,5 @@
 from collections import Counter
+from email.mime import base
 from MDAnalysis.analysis import align
 from MDAnalysis.analysis.dihedrals import Dihedral
 from MDAnalysis import transformations
@@ -495,8 +496,8 @@ def select_residue(uni, res_num):
     return residue
 
 
-def center_protein_in_box(uni):
-    with mda.Writer("/home/annika/md_sims/official_extraction/20_ns_sims_new/new_no_in_memory_center20.dcd", len(uni.atoms)) as dcd_writer:
+def center_protein_in_box(uni, base_path):
+    with mda.Writer(f"{base_path}/centered_protein.dcd", len(uni.atoms)) as dcd_writer:
         for ts in uni.trajectory:
             protein_atoms = uni.select_atoms("protein")
             ag = uni.atoms
@@ -514,10 +515,10 @@ def center_protein_in_box(uni):
 
 
 # Minimizing RMSD.
-def superimpose_to_last_frame(uni, ref_uni, top_file):
+def superimpose_to_last_frame(uni, ref_uni, top_file, base_path):
     for ts in uni.trajectory[-1]:
         for ts in ref_uni.trajectory[-1]:
-            mod_traj_filename = '/home/annika/md_sims/official_extraction/20_ns_sims_new/adding_new_wrap_superimposition_20.dcd'
+            mod_traj_filename = f'{base_md_filepath}/superimposed_protein.dcd'
             aligner = align.AlignTraj(
                 uni, ref_uni, select='protein', filename=mod_traj_filename).run()
             uni = mda.Universe(top_file, mod_traj_filename)
@@ -534,14 +535,6 @@ def obtain_dihedral_angles(atom_list, res_num_list):
     R = Dihedral(ags).run()
     return R.results.angles
 
-
-# Paths to obtain all MD related files for feature extraction
-base_md_file_path = '/home/annika/md_sims/'
-md_base_filepath = f'{base_md_file_path}official_extraction/20_ns_sims_new/'
-log_file_path = f'{md_base_filepath}prod_20ns.log'
-trajectory_file_path = f'{md_base_filepath}prod_20ns.dcd'
-topology_file_path = f'{md_base_filepath}end_20ns.pdb'
-
 # Recording start time.
 start_time = time.time()
 
@@ -553,6 +546,12 @@ args = parser.parse_args()
 json_filename = args.json_filename
 with open(json_filename) as config_file:
     data = json.load(config_file)
+
+# Paths to obtain all MD related files for feature extraction
+base_md_filepath = f"{data["base_md_filepath"]}/{data["combo"]}"
+log_file_path = f'{base_md_filepath}prod_20ns.log'
+trajectory_file_path = f'{base_md_filepath}prod_20ns.dcd'
+topology_file_path = f'{base_md_filepath}end_20ns.pdb'
 
 start_residue = data["start_residue"]
 end_residue = data["end_residue"]
@@ -620,7 +619,7 @@ feature_set = np.zeros((1, feature_set_length), dtype=object)
 
 if not new_csv:
     real_feat_list = obtain_cols_to_add(
-        '/home/annika/md_sims/official_extraction/', feature_list)
+        base_md_filepath, feature_list)
     for i in range(len(real_feat_list)):
         if '#' and 'Residue' in real_feat_list[i]:
             real_feat_list.remove(real_feat_list[i])
@@ -675,9 +674,9 @@ one_letter_rep_dict = {
 
 # Performing centering and alignment respectively.
 if data["center"]:
-    center_protein_in_box(universe)
+    center_protein_in_box(universe, base_md_filepath)
     universe = mda.Universe(
-        topology_file_path, '/home/annika/md_sims/official_extraction/20_ns_sims_new/new_no_in_memory_center20.dcd')
+        topology_file_path, f'{base_md_filepath}/centered_protein.dcd')
 if data["superimpose"]:
     universe = superimpose_to_last_frame(
         universe, universe, topology_file_path)
@@ -1253,7 +1252,7 @@ if new_csv:
                fmt='%s')
 else:
     extract_md_features(real_feat_list)
-    csv_to_add = find_csv_path('/home/annika/md_sims/official_extraction/')
+    csv_to_add = find_csv_path(f'{base_md_filepath}/')
     old_header_list = get_rows_for_csv(csv_to_add)
     new_header_list = old_header_list + real_feat_list
     header_string = create_header_string(
@@ -1293,7 +1292,7 @@ counter += 1
 feature_set[0, counter] = np.var(np.asarray(
     res_frame[' Radius of Gyration']), axis=0)
 
-np.savetxt(f'/home/annika/md_sims/official_extraction/{data["md_mutant_name"]}.csv',
+np.savetxt(f'{base_md_filepath}/{data["md_mutant_name"]}.csv',
            feature_set,
            delimiter=',',
            header=create_header_string(real_feature_list),

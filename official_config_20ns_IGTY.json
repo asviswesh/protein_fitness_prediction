@@ -1,0 +1,26 @@
+{
+    "base_md_filepath": ".",
+    "combo": "IGTY",
+    "md_mutant_filename": "2GI9_prepared_designed_32780_A_39I+A_40G+A_41T+A_54Y.pdb",
+    "start_residue": 1,
+    "end_residue": 56,
+    "time_interval": 250,
+    "center": true,
+    "superimpose": true,
+    "features": [
+        "Residue",
+        " Residue Name",
+        " Timestep",
+        " Backbone Displacement",
+        " Residue Centroid Displacement",
+        " Side Chain Centroid Displacement",
+        " Backbone to Side Chain Displacement",
+        " Entropy",
+        " Entropy State",
+        " Mean Potential Energy",
+        " Variance in Potential Energy",
+        " Radius of Gyration"
+    ],
+    "new_csv": true,
+    "new_csv_name": "/home/annika/md_sims/official_extraction/convergence_values_20_IGTY.csv"
+}

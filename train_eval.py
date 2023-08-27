@@ -15,27 +15,21 @@ from pytorchtools import EarlyStopping
 from tqdm.auto import tqdm
 from sklearn.metrics import mean_squared_error
 from scipy.stats import spearmanr
-from sklearn.metrics import ndcg_score
 from sklearn.model_selection import train_test_split, KFold
 from models import *
 from Datasets import Dataset
 
 
-def ndcg(y_true, y_pred):
-    y_true_normalized = y_true - min(y_true)
-    return ndcg_score(y_true_normalized.reshape(1, -1), y_pred.reshape(1, -1))
-
-
 class MLDESim():
     """Class for training and evaluating MLDE models."""
 
-    def __init__(self, save_path: str, encoding: str, model_class: str, n_samples: int, train_name: str, test_name: str, validation_name: str, first_append: bool, feat_to_predict: str, neural_network: bool) -> None:
+    def __init__(self, save_path: str, encoding: str, model_class: str, n_samples: int, train_name: str, test_name: str, validation_name: str, first_append: bool, feat_to_predict: str) -> None:
         """
         Args:
             save_path : path to save results
             encoding : encoding type
             model_class : model class
-            n_samples : number of samples to train on
+            n_samples : number of samples to test on
             train_name: name of train dataset
             test_name: name of test dataset
             validation_name: type of validation to use on the dataset
@@ -45,13 +39,11 @@ class MLDESim():
         self.train_name = train_name
         self.test_name = test_name
         self.validation_name = validation_name
-        self.neural_network = neural_network
         self.save_path = save_path
         self.num_workers = 1
 
         self.n_splits = 5
         self.n_subsets = 24
-        self.n_samples = n_samples
 
         self.n_solutions = 31
 
@@ -67,21 +59,21 @@ class MLDESim():
         random.seed(self.seed)
 
         self.train_fitness_df = pd.read_csv(
-            '/home/annika/mlde/' + self.train_name)
+            './mlde/' + self.train_name)
         self.test_fitness_df = pd.read_csv(
-            '/home/annika/mlde/' + self.test_name)
+            './mlde/' + self.test_name)
         self.test_with_fitness_df = pd.read_csv(
-            '/home/annika/mlde/gb1_test_with_fitness.csv'
+            './mlde/gb1_test_with_fitness.csv'
         )
+        self.n_samples = self.test_fitness_df.shape[0]
+
         self.train_dataset = Dataset(
             dataframe=self.train_fitness_df, dataset_type="train", to_predict=self.feat_to_predict)
         self.test_dataset = Dataset(
             dataframe=self.test_fitness_df, dataset_type="test", to_predict=self.feat_to_predict)
         self.test_dataset_with_fitness = Dataset(
             dataframe=self.test_with_fitness_df, dataset_type="test", to_predict=self.feat_to_predict)
-        # Couple the combo with the .npy file -> shoud know which index
-        # based on that - stor the embedding as list in the csv file.
-        # Do it for each variant in the loop.
+
         self.train_dataset.encode_X(encoding=encoding)
         self.test_dataset.encode_X(encoding=encoding)
         self.test_dataset_with_fitness.encode_X(encoding=encoding)
@@ -118,7 +110,7 @@ class MLDESim():
                             train_x, validation_x = train_index, test_index
                         else:
                             train_x = self.X_train_all
-                            validation_x = self.X_train_all  # used for validation if desired
+                            validation_x = self.X_train_all  
                         X_train = self.X_train_all[train_x]
                         y_train = self.y_train_all[train_x]
                         X_validation = self.X_train_all[validation_x]
@@ -222,8 +214,6 @@ class MLDESim():
 
     def run_neural_network(self, learning_rate, num_epochs):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        # For fold results
-        results = {}
         torch.manual_seed(42)
         k_folds = 5
         criterion = nn.MSELoss(reduction='sum')
@@ -247,12 +237,12 @@ class MLDESim():
             self.hidden_size2 = 30
             model = NeuralNet(self.input_size, self.hidden_size1,
                               self.hidden_size2, 1).to(device)
-        elif self.model_class == 'cnn v1':
+        elif self.model_class == 'cnn max-pooling':
             self.input_size = self.X_train_all.shape[1]
             self.output_size = 1
             model = OneDimensionalCNN(
                 self.input_size, self.output_size).to(device)
-        elif self.model_class == 'cnn v2':
+        elif self.model_class == 'cnn dropout':
             self.input_size = self.X_train_all.shape[1]
             self.dropout_prob = 0.25
             self.hidden_size = 64
@@ -285,21 +275,13 @@ class MLDESim():
             validationloader = torch.utils.data.DataLoader(
                 total_trainset,
                 batch_size=10, sampler=validation_subsampler)
-            # to track the training loss as the model trains
             train_losses = []
-            # to track the validation loss as the model trains
             valid_losses = []
-            # to track the training mse as the model trains
             train_mse = []
-            # to track the validation mse as the model trains
             valid_mse = []
-            # to track the average training loss per epoch as the model trains
             avg_train_losses = []
-            # to track the average validation loss per epoch as the model trains
             avg_valid_losses = []
-            # to track the average training mse per epoch as the model trains
             avg_train_mses = []
-            # to track the average validation mse per epoch as the model trains
             avg_valid_mses = []
             early_stopping = EarlyStopping(verbose=True)
             for epoch in range(self.num_epochs):
@@ -313,7 +295,6 @@ class MLDESim():
                     quantity_to_predict_cpu = quantity_to_predict.cpu().detach().numpy()
                     mse = mean_squared_error(
                         outputs_cpu, quantity_to_predict_cpu)
-                    # Backward and optimize
                     optimizer.zero_grad()
                     loss.backward()
                     optimizer.step()
@@ -321,11 +302,8 @@ class MLDESim():
                     train_mse.append(mse)
 
                 for data, target in validationloader:
-                    # forward pass: compute predicted outputs by passing inputs to the model
                     output = model(data.to(device))
-                    # calculate the loss
                     loss = criterion(output, target.to(device))
-                    # record validation loss
                     output_cpu = output.cpu().detach().numpy()
                     target_cpu = target.cpu().detach().numpy()
                     mse = mean_squared_error(output_cpu, target_cpu)
@@ -348,20 +326,37 @@ class MLDESim():
                              f'average train_mse: {train_mses:.5f} ' +
                              f'average valid_mse: {valid_mses:.5f} ')
 
-                print(print_msg)
+                train_loss_x_axis = np.arange(len(train_losses))
+                # Training loss plot per epoch and fold
+                plt.figure()
+                plt.title(f"Training loss for epoch {epoch:>{epoch_len}} and fold {fold}")
+                plt.plot(train_loss_x_axis, train_losses)
+                plt.savefig(self.save_path + f'training_loss_epoch_{epoch:>{epoch_len}}_fold_{fold}.png', dpi=300)
+                # Validation loss plot per epoch and fold
+                plt.figure()
+                plt.title(f"Validation loss for epoch {epoch:>{epoch_len}} and fold {fold}")
+                plt.plot(train_loss_x_axis, train_losses)
+                plt.savefig(self.save_path + f'validation_loss_epoch_{epoch:>{epoch_len}}_fold_{fold}.png', dpi=300)
 
-                # clear lists to track next epoch
                 train_losses = []
                 valid_losses = []
 
-                # early_stopping needs the validation loss to check if it has decresed,
-                # and if it has, it will make a checkpoint of the current model
                 early_stopping(valid_loss, model)
 
                 if early_stopping.early_stop:
                     break
-
-        # move the testing and average across all five loops.
+        
+            # Plotting mean training loss
+            epoch_len = np.arange(len(str(self.num_epochs)))
+            plt.figure()
+            plt.title(f"Mean training loss across all folds.")
+            plt.plot(epoch_len, avg_train_losses)
+            plt.savefig(self.save_path + f'average_train_loss.png', dpi=300)
+            # Plotting mean validation loss
+            plt.figure()
+            plt.title(f"Mean training loss across all folds.")
+            plt.plot(epoch_len, avg_valid_losses)
+            plt.savefig(self.save_path + f'average_validation_loss.png', dpi=300)
         with torch.no_grad():
             label_index = 0
             final_outputs = np.zeros((self.n_samples, ))

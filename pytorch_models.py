@@ -4,7 +4,7 @@ import torch.utils.data
 import torch.nn as nn
 import torch.nn.functional as F
 
-# CNN v2
+# CNN containing flattening and dropout
 class MLDECNN(nn.Module):
     def __init__(self, input_size, output_size, kernel_size, hidden_size, dropout_prob):
         super(MLDECNN, self).__init__()
@@ -54,7 +54,7 @@ class MLDECNN(nn.Module):
         conv_output = self.fc2(conv_output)
         return conv_output
 
-# CNN v1
+# One-dimensional CNN with max pooling
 class OneDimensionalCNN(nn.Module):
     def __init__(self, input_size, output_size):
         super(OneDimensionalCNN, self).__init__()
@@ -91,7 +91,7 @@ class OneDimensionalCNN(nn.Module):
             fc_input_size = conv_output.view(conv_output.size(0), -1).size(1)
         return fc_input_size
 
-# Feed forward Neural Network with two hidden layers.
+# Feed Forward Neural Network with two hidden layers.
 class NeuralNet(nn.Module):
     def __init__(self, input_size, hidden_size_l1, hidden_size_l2, num_output):
         super(NeuralNet, self).__init__()
