@@ -6,7 +6,7 @@ This repository contains the code used to generate relevant feature data based o
 
 Below is an explanation of each of the files presented in this repository <br />
 
-**create_json_mutant.py** - Creates a custom .json configuration file for feature extraction based on .pdb TRIAD file one wishes to extract MD-related features on. <br />
+**create_json_mutant.py** - Creates a custom .json configuration file for feature extraction based on .pdb TRIAD file one wishes to extract MD-related features on and the base path one wishes to place the custom .json configuration file in. <br />
 
 To generate a custom .json configuration file, run the following
 ```bash
