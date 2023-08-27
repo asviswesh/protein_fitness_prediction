@@ -1,5 +1,4 @@
 from collections import Counter
-from email.mime import base
 from MDAnalysis.analysis import align
 from MDAnalysis.analysis.dihedrals import Dihedral
 from MDAnalysis import transformations
