@@ -66,6 +66,6 @@ parser.add_argument("base_path")
 args = parser.parse_args()
 base_path = args.base_path
 
-create_train_dataset('gb1_train.csv')
-create_test_dataset('gb1_test.csv', True)
-create_test_dataset('gb1_test_with_fitness.csv', False)
+create_train_dataset(base_path, 'gb1_train.csv')
+create_test_dataset(base_path, 'gb1_test.csv', True)
+create_test_dataset(base_path, 'gb1_test_with_fitness.csv', False)
