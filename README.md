@@ -10,7 +10,7 @@ Below is an explanation of each of the files presented in this repository <br />
 
 To generate a custom .json configuration file, run the following
 ```bash
-python3 create_json_mutant.py [triad_struct_filename]
+python3 create_json_mutant.py [triad_struct_filename] [base_path]
 ```
 All TRIAD files that can be inputted into this program must be named in a similar manner to what is presented below
 ```bash
