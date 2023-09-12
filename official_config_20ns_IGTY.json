@@ -22,5 +22,5 @@
         " Radius of Gyration"
     ],
     "new_csv": true,
-    "new_csv_name": "/home/annika/md_sims/official_extraction/convergence_values_20_IGTY.csv"
+    "new_csv_name": "./md_sims/official_extraction/convergence_values_20_IGTY.csv"
 }
