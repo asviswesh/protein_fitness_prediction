@@ -1,3 +1,5 @@
+# Leveraging Structural and Biophysical Information for Machine Learning-Assisted Protein Engineering
+
 Code for comprehensive feature extraction from multimodal, physically informed representations, including structural and biophysical information from molecular dynamics simulations and machine learning baseline tests based on one-hot encoded sequence data. Research conducted under Professor Frances Arnold at Caltech.
 
 
@@ -33,3 +35,12 @@ To generate a dataset for a customized mutant, run the following
 python3 run-md.py [triad_struct_filename]
 ```
 **train_eval.py** - Contains the architecture for encoding sequence data via one-hot encodings, training, and testing machine learning models needed for baseline tests.
+
+---
+
+<h3 align="center">Abstract</h3>
+<h3 align="center">Leveraging Structural and Biophysical Information for Machine Learning-Assisted Protein Engineering</h3>
+
+Directed evolution, a powerful technique in protein engineering, enhances the transformation of challenging enzymes. However, its efficiency requires predominantly additive protein variants. Machine learning-assisted directed evolution (MLDE) overcomes this by training sequence-fitness models with experimental data from combinatorial protein variant libraries, enhancing sequence space exploration efficiency. Unlike previous MLDE methods that relied solely on protein sequence encodings, our research leverages multimodal, physically informed representations encompassing structural and biophysical information. This shift is motivated by the demand for more accurate, interpretable protein engineering models. Focusing on the immunoglobulin-binding protein GB1, we successfully engineer comprehensive features from molecular dynamics (MD) simulations, including residue-related distances, and develop a novel algorithm to calculate per-residue Shannon entropy, enriching our insights into protein dynamics. To ensure data accuracy, we rigorously verify MD equilibrium through Entropy and RMSD analyses, complemented by innovative algorithms for precision and noise reduction. Baseline tests with one-hot encoded sequences confirm our machine learning model's reliability, mirroring Dallago et al.'s findings. Our feature extraction pipeline, designed for GB1, demonstrates adaptability for other enzymes through customizable data parameters. Future work includes replicating MD simulations with varied initial conditions, building diverse machine learning models, and comprehensive evaluations for protein fitness prediction to assess our approach's effectiveness.
+
+---
